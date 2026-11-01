@@ -458,7 +458,7 @@ const SPI={bolt:'<svg viewBox="0 0 24 24"><path d="M13.5 1.5L4 14h6.5l-1.5 8.5L2
 let coins=0,lastLines=0;
 const SHOP=[
  {n:'Bomba',d:'Explode uma área 3x3',p:350,g:{bomb:1}},
- {n:'Trocar',d:'Sorteia 3 peças novas',p:60,g:{swap:1}},
+ {n:'Trocar',d:'Sorteia 3 peças novas',p:150,g:{swap:1}},
  {n:'Girar',d:'Gira as peças da bandeja',p:45,g:{rot:1}},
  {n:'Kit completo',d:'1 bomba, 1 troca e 1 giro',p:400,g:{bomb:1,swap:1,rot:1}}
 ];
@@ -506,11 +506,11 @@ function openLvl(){
   const UN={2:'Libera gemas, peças raio/explosão e pedras',3:'Peças grandes passam a aparecer'};
   const fmt=n=>n.toLocaleString('pt-BR');
   const need=tot(level+1)-score;
-  $('lvlInfo').textContent='Nível '+level+' · faltam '+fmt(need)+' pontos para o '+(level+1);
+  $('lvlInfo').textContent='Nível '+level+' (+'+lvPct(level)+'% de pontos) · faltam '+fmt(need)+' pontos para o '+(level+1);
   let h='';
   for(let L=1;L<=12;L++){
     const pts=tot(L),cls=L===level?' cur':(L<level?' done':' lock');
-    const rw=L>1?'+'+(L-1)*5+'% de pontos':'Nível inicial';
+    const rw=L>1?'+'+lvPct(L)+'% de pontos em tudo':'Nível inicial';
     h+=`<div class="arow${cls}"><span class="ln">${L<level?'✓':L}</span><div><b>${TITLES[Math.min(L-1,TITLES.length-1)]}</b><small>${rw}${UN[L]?'<br>'+UN[L]:''}</small></div><em class="lp">${fmt(pts)} pts${L===level?'<small>você está aqui</small>':''}</em></div>`;
   }
   $('lvList').innerHTML=h;
@@ -554,17 +554,55 @@ let life=store.get('bb-life',{lines:0,gems:0});
 // Pontos acumulados para chegar ao nível L (cada nível custa 300 × nível anterior)
 const tot=L=>300*(L-1)*L/2;
 const levelOf=s=>{let L=1;while(s>=tot(L+1))L++;return L;};
+const lvPct=L=>L<=7?(L-1)*10:60+(L-7)*5;
 const filled=()=>grid.flat().filter(v=>v!==null).length;
 
 function randPiece(){
-  const bigChance=level>=3?Math.min(0.2+level*0.08,0.7):0;
+  const bigChance=level>=3?Math.min(0.2+level*0.08,0.55):0;
   const pool=Math.random()<bigChance?BIG:SMALL;
   const shape=pool[Math.floor(Math.random()*pool.length)];
   let gem=null,sp=null;
   const cl=[];shape.forEach((row,i)=>row.forEach((v,j)=>{if(v)cl.push([i,j]);}));
   if(level>=2&&Math.random()<.2)gem=cl[Math.floor(Math.random()*cl.length)];
-  else if(level>=2&&Math.random()<.14){const c=cl[Math.floor(Math.random()*cl.length)];sp=[c[0],c[1],Math.random()<.5?'bolt':'boom'];}
+  else if(level>=2&&Math.random()<.14+filled()/64*.2){const c=cl[Math.floor(Math.random()*cl.length)];sp=[c[0],c[1],Math.random()<.5?'bolt':'boom'];}
   return{shape,color:TH[Math.floor(Math.random()*TH.length)],gem,sp};
+}
+let mood=.5,moodT=0,dry=0;
+function evalP(shape){
+  let fit=0,best=0;
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){
+    if(!fits(shape,r,c))continue;fit++;
+    const g=grid.map(x=>x.slice());
+    shape.forEach((row,a)=>row.forEach((v,b)=>{if(v)g[r+a][c+b]=1;}));
+    let n=0;
+    for(let a=0;a<N;a++){if(g[a].every(v=>v!==null))n++;if(g.every(x=>x[a]!==null))n++;}
+    if(n>best)best=n;
+  }
+  return{fit,best};
+}
+function bestOf(n,must){
+  let best=null,bs=-1;
+  for(let i=0;i<n;i++){
+    const p=randPiece(),e=evalP(p.shape);
+    if(!e.fit)continue;
+    const sc=e.best*10+Math.min(e.fit,12)+Math.random()*3;
+    if(sc>bs){bs=sc;best=p;}
+  }
+  if(!best&&must){
+    for(const sh of SMALL.slice().sort(()=>Math.random()-.5))
+      if(canPlaceAny(sh))return{shape:sh,color:TH[Math.floor(Math.random()*TH.length)],gem:null,sp:null};
+  }
+  return best||randPiece();
+}
+// Humor dinâmico: fases em que o jogo ajuda mais e fases mais duras; quanto mais cheio o tabuleiro, mais ajuda
+function genTray(){
+  const fl=filled()/64;
+  if(--moodT<=0){mood=Math.random();moodT=2+Math.floor(Math.random()*3);}
+  const h=Math.max(.1,Math.min(.95,.2+fl*.9+(mood-.5)*.7+Math.min(.3,dry*.04)-(combo>=3?.1:0)));
+  const t=[];
+  for(let i=0;i<3;i++)t.push(Math.random()<h?bestOf(10):randPiece());
+  if(!t.some(p=>canPlaceAny(p.shape)))t[Math.floor(Math.random()*3)]=bestOf(30,true);
+  return t;
 }
 function fits(shape,r,c){
   for(let i=0;i<shape.length;i++)for(let j=0;j<shape[i].length;j++){
@@ -639,7 +677,7 @@ function useItem(k){
   disarm();
   if(inv[k]<1)return;
   inv[k]--;
-  if(k==='swap'){tray=[randPiece(),randPiece(),randPiece()];renderTray([0,1,2]);sfx([440,554,659],.18,.06);}
+  if(k==='swap'){tray=genTray();renderTray([0,1,2]);sfx([440,554,659],.18,.06);}
   else{tray=tray.map(p=>p&&rot(p));renderTray();pop(500,760,.12,'sine',.35);}
   updTools();checkStuck();
 }
@@ -658,7 +696,7 @@ function bombAt(k){
   });
   const bd=$('bw');bd.classList.remove('shake');void bd.offsetWidth;bd.classList.add('shake');
   if(gems){addCoins(gems*6);life.gems+=gems;store.set('bb-life',life);unlock('gem1');if(life.gems>=10)unlock('gem10');}
-  addScore(hit.length*10+gems*60);popup('+'+(hit.length*10+gems*60),'big',0);
+  const bp=Math.round((hit.length*10+gems*60)*(1+lvPct(level)/100));addScore(bp);popup('+'+bp,'big',0);
   setTimeout(()=>{hit.forEach(i=>{grid[i>>3][i&7]=null;gemG[i>>3][i&7]=false;});paint();busy=false;updTools();checkStuck();if(filled()===0)themeSwitch();},460);
 }
 $('tBomb').onclick=()=>useItem('bomb');$('tSwap').onclick=()=>useItem('swap');$('tRot').onclick=()=>useItem('rot');
@@ -701,7 +739,7 @@ function addScore(n){
   if(L>level){
     level=L;bgE=4;
     sfx([523,659,784,1046,1318],.34,.1);
-    banner(`<small>Nível ${L}</small><b>${TITLES[Math.min(L-1,TITLES.length-1)]}</b>`);
+    banner(`<small>Nível ${L} · +${lvPct(L)}% de pontos</small><b>${TITLES[Math.min(L-1,TITLES.length-1)]}</b>`);
     if(L>=5)unlock('lvl5');
     if(L>=7)unlock('lvl7');
   }
@@ -961,7 +999,7 @@ function place(i,r,c){
     else for(let a=sr-1;a<=sr+1;a++)for(let b=sc-1;b<=sc+1;b++)if(a>=0&&b>=0&&a<N&&b<N)sx.add(a*8+b);
   }
   const lines=rows.length+cols.length+(p.sp?1:0);
-  lastLines=lines;
+  lastLines=lines;dry=lines?0:dry+1;
   const clr=new Set();
   rows.forEach(a=>{for(let b=0;b<N;b++)clr.add(a*8+b);});
   cols.forEach(b=>{for(let a=0;a<N;a++)clr.add(a*8+b);});
@@ -976,11 +1014,11 @@ function place(i,r,c){
   const big=cells>=5?cells*2:0;
   const clutch=lines&&before+cells>=48?Math.round(lineGain*.3):0;
   const perfect=lines&&before+cells-clr.size===0?400*level:0;
-  const lm=1+(level-1)*.05;
-  const base=(cells+lineGain+big+clutch+cross)*lm;
+  const lm=1+lvPct(level)/100;
+  const base=cells+lineGain+big+clutch+cross,mm=mult*lm;
   let gems=0;clr.forEach(k=>{if(gemG[k>>3][k&7])gems++;});
   let stn=0;clr.forEach(k=>{if(grid[k>>3][k&7]==='x')stn++;});
-  const total=Math.round((base+perfect+gems*60+stn*40)*mult);
+  const total=Math.round((base+perfect+gems*60+stn*40)*mm);
 
   const parts=[['+'+cells,'base']];
   if(lines)parts.push([(lines>1?lines+' linhas':'Linha')+' +'+Math.round(lineGain*mult),'line']);
@@ -993,6 +1031,8 @@ function place(i,r,c){
   if(stn)parts.push(['Pedra quebrada +'+Math.round(stn*40*mult),'big']);
   const cg=(lines?2+Math.floor(Math.random()*5):0)+gems*6+(perfect?30:0)+stn*8;
   if(cg)parts.push(['+'+cg+' moedas','combo']);
+  const lvb=total-Math.round((base+perfect+gems*60+stn*40)*mult);
+  if(lvb>0)parts.push(['Bônus de nível +'+lvb,'combo']);
   if(mult>1)parts.push(['Multiplicador x'+mult,'combo']);
 
   stats.lines+=lines;stats.best=Math.max(stats.best,combo);
@@ -1055,9 +1095,9 @@ function dropStone(){
 }
 function finishTurn(){
   busy=false;
-  if(!dead&&!lastLines&&level>=2&&stats.pieces>0&&stats.pieces%6===0)dropStone();
+  if(!dead&&!lastLines&&level>=2&&mood<.6&&stats.pieces>0&&stats.pieces%6===0)dropStone();
   let fresh=[];
-  if(tray.every(p=>!p)){tray=[randPiece(),randPiece(),randPiece()];fresh=[0,1,2];}
+  if(tray.every(p=>!p)){tray=genTray();fresh=[0,1,2];}
   renderTray(fresh);
   hud();
   checkStuck();
@@ -1163,12 +1203,13 @@ function setTheme(id){curTh=id;const t=THEMES[id];document.body.dataset.th=id;do
 function newGame(){
   {const o=THK.filter(k=>k!==curTh);setTheme(o[Math.floor(Math.random()*o.length)]);}
   grid=Array.from({length:N},()=>Array(N).fill(null));
+  mood=.5;moodT=0;dry=0;
   gemG=Array.from({length:N},()=>Array(N).fill(false));
   inv={bomb:1,swap:1,rot:2};armed=false;coins=0;$('coinN').textContent=0;$('shopN').textContent=0;document.body.classList.remove('aim');
   score=0;shown=0;combo=0;miss=0;lastTier=0;level=1;
   stats={lines:0,pieces:0,best:0};
   dead=false;paused=false;busy=false;drag=null;swapping=false;lastLines=0;
-  tray=[randPiece(),randPiece(),randPiece()];
+  tray=genTray();
   paint();renderTray([0,1,2]);hud();
   $('score').textContent=0;
   $('endOver').classList.remove('show');
