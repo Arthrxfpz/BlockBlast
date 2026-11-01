@@ -457,16 +457,16 @@ const ICON={
 const SPI={bolt:'<svg viewBox="0 0 24 24"><path d="M13.5 1.5L4 14h6.5l-1.5 8.5L20 9.5h-6.8z" fill="#ffe14a" stroke="#b86b00" stroke-width="1.6" stroke-linejoin="round"/></svg>',boom:'<svg viewBox="0 0 24 24"><circle cx="12" cy="14" r="8" fill="#3a384d" stroke="#fff" stroke-width="1.6"/><path d="M12 6V2.5M16 3.5l-4 2.5" stroke="#ff8a3d" stroke-width="2.2" stroke-linecap="round"/></svg>'};
 let coins=0,lastLines=0;
 const SHOP=[
- {n:'Bomba',d:'Explode uma área 3x3',p:50,g:{bomb:1}},
- {n:'Trocar',d:'Sorteia 3 peças novas',p:25,g:{swap:1}},
- {n:'Girar',d:'Gira as peças da bandeja',p:20,g:{rot:1}},
- {n:'Kit completo',d:'1 bomba, 1 troca e 1 giro',p:80,g:{bomb:1,swap:1,rot:1}}
+ {n:'Bomba',d:'Explode uma área 3x3',p:350,g:{bomb:1}},
+ {n:'Trocar',d:'Sorteia 3 peças novas',p:60,g:{swap:1}},
+ {n:'Girar',d:'Gira as peças da bandeja',p:45,g:{rot:1}},
+ {n:'Kit completo',d:'1 bomba, 1 troca e 1 giro',p:400,g:{bomb:1,swap:1,rot:1}}
 ];
 function icons(){document.querySelectorAll('[data-ic]').forEach(e=>{if(!e.firstChild)e.innerHTML=ICON[e.dataset.ic];});}
 function addCoins(n){
   coins=Math.max(0,coins+n);
   $('coinN').textContent=coins;$('shopN').textContent=coins;
-  if(coins>=200)unlock('rich');
+  if(coins>=500)unlock('rich');
   const c=$('coinBtn');c.classList.remove('bump');void c.offsetWidth;c.classList.add('bump');
   if($('shopOver').classList.contains('show'))renderShop();
 }
@@ -510,7 +510,7 @@ function openLvl(){
   let h='';
   for(let L=1;L<=12;L++){
     const pts=tot(L),cls=L===level?' cur':(L<level?' done':' lock');
-    const rw=L>1?'+'+(20+L*5)+' moedas · +'+(L-1)*5+'% de pontos':'Nível inicial';
+    const rw=L>1?'+'+(L-1)*5+'% de pontos':'Nível inicial';
     h+=`<div class="arow${cls}"><span class="ln">${L<level?'✓':L}</span><div><b>${TITLES[Math.min(L-1,TITLES.length-1)]}</b><small>${rw}${UN[L]?'<br>'+UN[L]:''}</small></div><em class="lp">${fmt(pts)} pts${L===level?'<small>você está aqui</small>':''}</em></div>`;
   }
   $('lvList').innerHTML=h;
@@ -538,7 +538,7 @@ const ACH={
  lines50:['Faxineiro','Limpe 50 linhas no total'],
  bomb1:['Explosão','Use uma bomba'],
  shop1:['Cliente','Faça uma compra na loja'],
- rich:['Cofrinho','Junte 200 moedas'],
+ rich:['Cofrinho','Junte 500 moedas'],
  pieces100:['Maratonista','Encaixe 100 peças numa partida'],
  s1k:['Mil pontos','Faça 1.000 pontos'],
  s5k:['5.000 pontos','Faça 5.000 pontos'],
@@ -657,7 +657,7 @@ function bombAt(k){
     const q=el.getBoundingClientRect();burst(q.left+q.width/2,q.top+q.height/2,grid[i>>3][i&7],8);
   });
   const bd=$('bw');bd.classList.remove('shake');void bd.offsetWidth;bd.classList.add('shake');
-  if(gems){addCoins(gems*10);life.gems+=gems;store.set('bb-life',life);unlock('gem1');if(life.gems>=10)unlock('gem10');}
+  if(gems){addCoins(gems*6);life.gems+=gems;store.set('bb-life',life);unlock('gem1');if(life.gems>=10)unlock('gem10');}
   addScore(hit.length*10+gems*60);popup('+'+(hit.length*10+gems*60),'big',0);
   setTimeout(()=>{hit.forEach(i=>{grid[i>>3][i&7]=null;gemG[i>>3][i&7]=false;});paint();busy=false;updTools();checkStuck();if(filled()===0)themeSwitch();},460);
 }
@@ -704,7 +704,6 @@ function addScore(n){
     banner(`<small>Nível ${L}</small><b>${TITLES[Math.min(L-1,TITLES.length-1)]}</b>`);
     if(L>=5)unlock('lvl5');
     if(L>=7)unlock('lvl7');
-    addCoins(20+L*5);
   }
   if(score>=1000)unlock('s1k');
   if(score>=5000)unlock('s5k');
@@ -992,7 +991,7 @@ function place(i,r,c){
   if(gems)parts.push(['Gema'+(gems>1?'s':'')+' +'+Math.round(gems*60*mult),'perfect']);
   if(p.sp)parts.push([p.sp[2]==='bolt'?'Raio!':'Explosão!','perfect']);
   if(stn)parts.push(['Pedra quebrada +'+Math.round(stn*40*mult),'big']);
-  const cg=(lines?5+Math.floor(Math.random()*11):0)+gems*10+(perfect?50:0)+stn*15;
+  const cg=(lines?2+Math.floor(Math.random()*5):0)+gems*6+(perfect?30:0)+stn*8;
   if(cg)parts.push(['+'+cg+' moedas','combo']);
   if(mult>1)parts.push(['Multiplicador x'+mult,'combo']);
 
