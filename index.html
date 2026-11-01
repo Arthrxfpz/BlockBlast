@@ -948,7 +948,7 @@ function startDrag(e,i){
   const g=pieceEl(p,cs,GAP,'ghost');
   document.body.appendChild(g);
   const slot=trayEl.children[i];if(slot)slot.classList.add('lifted');
-  drag={i,p,g,slot,step:cs+GAP,w:p.shape[0].length,h:p.shape.length,lift:e.pointerType==='touch'?(cs+GAP)*1.6:0};
+  drag={i,p,g,slot,step:cs+GAP,w:p.shape[0].length,h:p.shape.length,lift:(cs+GAP)*(e.pointerType==='touch'?1.8:1.2)};
   moveDrag(e);
   addEventListener('pointermove',moveDrag);
   addEventListener('pointerup',endDrag);
